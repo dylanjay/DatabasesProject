@@ -777,37 +777,71 @@ public class Messenger {
        try{
            clearTerminal();
            boolean inLeaveChat = true;
-           while (inLeaveChat){
-               //first we output all the chats with the chat memebrs so user can see
-               String query = String.format("SELECT chat_id FROM chat_list WHERE member = '%s'", authorisedUser);
-               List<List<String>> result = esql.executeQueryAndReturnResult(query);
-               
-               //for loop to iterate through results; results contains the id of every chat the user initiated
-               for(int i = 0; i < result.size(); i++){
-                   
-                   //query to get all the members of a chat
-                   query = String.format("SELECT member FROM chat_list WHERE chat_id = %s", result.get(i).get(0));
-                   List<List<String>> chatMembers = esql.executeQueryAndReturnResult(query);
-                   
-                   for (int j = 0; j < result.get(i).size(); j++){
-                       
-                       //print out room number
-                       System.out.print(result.get(i).get(j) + "\t");
-                       
-                       //iterate through members
-                       for (int l = 0; l < chatMembers.size(); l++){
-                           
-                           for(int m = 0; m < chatMembers.get(l).size(); m++){
-                               System.out.print(chatMembers.get(l).get(m).replace(" ", "") + " ");
-                           }
+
+           //first we output all the chats with the chat memebrs so user can see
+           String query = String.format("SELECT chat_id FROM chat_list WHERE member = '%s'", authorisedUser);
+           List<List<String>> result = esql.executeQueryAndReturnResult(query);
+
+           //for loop to iterate through results; results contains the id of every chat the user initiated
+           for(int i = 0; i < result.size(); i++){
+
+               //query to get all the members of a chat
+               query = String.format("SELECT member FROM chat_list WHERE chat_id = %s", result.get(i).get(0));
+               List<List<String>> chatMembers = esql.executeQueryAndReturnResult(query);
+
+               for (int j = 0; j < result.get(i).size(); j++){
+
+                   //print out room number
+                   System.out.print(result.get(i).get(j) + "\t");
+
+                   //iterate through members
+                   for (int l = 0; l < chatMembers.size(); l++){
+
+                       for(int m = 0; m < chatMembers.get(l).size(); m++){
+                           System.out.print(chatMembers.get(l).get(m).replace(" ", "") + " ");
                        }
-                       System.out.print("\n");
+                   }
+                   System.out.print("\n");
+               }
+           }
+
+           //event loop for leave chat
+           while (inLeaveChat){
+
+               System.out.print("\nEnter chat room id to leave(blank to go back): ");
+               String targetChat = in.readLine();
+
+               if (targetChat == "") {
+                   inLeaveChat = false;
+                   break;
+               }
+
+               //check if the chat room exists
+               query = String.format("SELECT * FROM chat WHERE chat_id = %s", targetChat);
+               List<List< String >> result = esql.executeQueryAndReturnResult(query);
+               if(result.size() == 1){
+                   query = String.format("SELECT init_sender FROM chat WHERE chat_id = %s", targetChat);
+                   result = esql.executeQueryAndReturnResult(query);
+
+                   System.out.print(result.get(0).get(0).replace(" ", ""));
+
+                   //check if chat was started by current user
+                   if(result.get(0).get(0).replace(" ", "") == authorisedUser){
+                       //chat is started by current user, delete chat and remove all users
+                       query = String.format("DELETE FROM chat WHERE chat_id = %s", targetChat);
+                       esql.executeUpdate(query);
+                       //cascade handles members in the chat list
+                   }
+                   else {
+                       //chat is not started by current user, simply remove him from chat
+                       query = String.format("DELETE FROM chat_list WHERE chat_id = %s AND memeber = '%s'", targetChat, authorisedUser);
+                       esql.executeUpdate(query);
                    }
                }
-               System.out.print("\nEnter chat room id to leave");
-               
+               else {
+                   System.out.print("\nError! No chat with id %s.", targetChat);
+               }
            }
-           
        }
        catch(Exception e) {
            System.err.println(e.getMessage());
