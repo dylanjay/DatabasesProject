@@ -325,10 +325,10 @@ public class Messenger {
                        }
                      }
 		     break;
-                   case 3: NewMessage(esql, authorisedUser); break;
+		     //case 3: NewMessage(esql, authorisedUser); break;
                    case 4: StartOrLeaveChat(esql, authorisedUser); break;
 		   case 5: ListChats(esql, authorisedUser); break;
-                   //case 6: DeleteUser(esql, authorisedUser); break;
+     		   case 6: if(DeleteUser(esql, authorisedUser) == 1){usermenu = false;} break;
                    case 9: usermenu = false; break;
                    default : System.out.println("Unrecognized choice!"); break;
                 }
@@ -407,14 +407,34 @@ public class Messenger {
       }
    }//end
 
-  public static void DeleteUser(Messenger esql){
+  public static int DeleteUser(Messenger esql, String authorisedUser){
     try{
-     
-   
+      System.out.print("\tAre you sure you wish to delete your account?(y/n): ");
+      String answer = in.readLine();
+      if(answer.equals("y"))
+      {
+	String query = String.format("SELECT l.member AS user FROM chat_list l WHERE l.member = '%s' UNION SELECT m.sender_login AS user FROM message m WHERE m.sender_login = '%s' UNION SELECT u.list_member AS user FROM user_list_contains u WHERE u.list_member = '%s'", authorisedUser, authorisedUser, authorisedUser);
+	int userNum = esql.executeQuery(query);
+	if(userNum < 1)
+	{
+	  query = String.format("DELETE FROM usr WHERE login = '%s'", authorisedUser);
+	  esql.executeUpdate(query);
+	  String output = String.format("\t%s succesfully removed user %s!\n", authorisedUser, authorisedUser);
+	  System.out.print(output);
+	  return 1;
+	}
+	else
+	{
+	  System.out.print("\tError, you have records referring to this account so cannot be deleted!\n");
+	  return -1;
+	}
+	
+      }
+      return -1;
     }
     catch(Exception e){
       System.err.println(e.getMessage());
-      return;
+      return -1;
     }
   }
    
@@ -661,7 +681,7 @@ public class Messenger {
       
       String query = String.format("INSERT INTO message (msg_text, sender_login, chat_id) VALUES('%s', '%s', '%s')", msg, authorisedUser, chatID);
       esql.executeUpdate(query);
-      String output = String.format("\tThe message "%s" was written successfully", msg);
+      String output = String.format("\tThe message '%s' was written successfully", msg);
       System.out.print(output);
       return;
     }
