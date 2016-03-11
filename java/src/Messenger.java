@@ -280,10 +280,9 @@ public class Messenger {
                 System.out.println("---------");
                 System.out.println("1. Access Contacts List");
                 System.out.println("2. Access Blocks List");
-                System.out.println("3. Write a new message");
-                System.out.println("4. Start or leave a chat");
-                System.out.println("5. Browse active chats");
-                System.out.println("6. Delete account");
+                System.out.println("3. Start or leave a chat");
+                System.out.println("4. Browse active chats");
+                System.out.println("5. Delete account");
                 System.out.println(".........................");
                 System.out.println("9. Log out");
                 switch (readChoice()){
@@ -327,10 +326,9 @@ public class Messenger {
                        }
                      }
 		     break;
-		   case 3: NewMessage(esql, authorisedUser); break;
-                   case 4: StartOrLeaveChat(esql, authorisedUser); break;
-		   case 5: ListChats(esql, authorisedUser); break;
-     		   case 6: if(DeleteUser(esql, authorisedUser) == 1){usermenu = false;} break;
+                   case 3: StartOrLeaveChat(esql, authorisedUser); break;
+		   case 4: ListChats(esql, authorisedUser); break;
+     		   case 5: if(DeleteUser(esql, authorisedUser) == 1){usermenu = false;} break;
                    case 9: usermenu = false; break;
                    default : System.out.println("Unrecognized choice!"); break;
                 }
@@ -456,6 +454,8 @@ public class Messenger {
          int userNum = esql.executeQuery(query);
 	 if (userNum > 0)
 		return login;
+	 else
+	   System.out.print("\tUser name or password entered is not valid\n");
          return null;
       }catch(Exception e){
          System.err.println (e.getMessage ());
@@ -566,16 +566,36 @@ public class Messenger {
 
   public static void ListChats(Messenger esql, String authorisedUser){
      try{
-         clearTerminal();
        String query = String.format("SELECT l.chat_id, l.member FROM chat_list l, chat c WHERE c.init_sender = '%s' AND c.chat_id = l.chat_id", authorisedUser);
-       esql.executeQueryAndPrintResult(query);
+       esql.executeQuery(query);
        int num = esql.executeQuery(query);
        if(num < 1)
        {
 	 System.out.print("\tChat List is empty\n");
 	 return;
        }
-       PrintChats(esql, authorisedUser);
+       ShowChat(esql, authorisedUser);
+       boolean inBrowseChat = true;
+       while (inBrowseChat){
+	 System.out.print("\nEnter chat room id to view messages(blank to go back): ");
+	 String targetChat = in.readLine();
+	 
+	 if (targetChat == "") {
+	   inBrowseChat = false;
+	   return;
+	 }
+	 
+	 //check if the chat room exists
+	 query = String.format("SELECT * FROM chat WHERE chat_id = %s AND init_sender = '%s'", targetChat, authorisedUser);
+	 List<List< String >> result = esql.executeQueryAndReturnResult(query);
+	 if(result.size() == 1){
+	   MessageMenu(esql, authorisedUser, targetChat);
+	   return;
+	 }
+	 else{
+	   System.out.println("Error, you do not own chat.");
+	 }
+       }
      }
      catch(Exception e){
        System.err.println(e.getMessage());
@@ -583,35 +603,157 @@ public class Messenger {
      }
    }//end
 
-  public static void PrintChats(Messenger esql, String authorisedUser){
+  public static void MessageMenu(Messenger esql, String authorisedUser, String targetChat){
+    try{
+      boolean messageMenu = true;
+      while(messageMenu) {
+	System.out.println("Messages Menu");
+	System.out.println("------------");
+	System.out.println("1. View Messages");
+	System.out.println("2. Add New Message");
+	System.out.println("3. Edit Existing Message");
+	System.out.println("4. Delete an Existing Message");
+	System.out.println(".........................");
+	System.out.println("9. Go back to Browse Chats");
+	switch(readChoice()){
+	case 1: PrintChats(esql, authorisedUser, targetChat); break;
+	case 2: NewMessage(esql, authorisedUser, targetChat); break;
+	case 3: EditMessage(esql, authorisedUser, targetChat); break;
+	case 4: RemoveMessage(esql, authorisedUser, targetChat); break;
+	case 9: messageMenu = false; break;
+	default: System.out.println("Unrecognized choice!"); break;
+	}
+      }
+    }
+    catch(Exception e){
+      System.err.println(e.getMessage());
+      return;
+    }
+  }
+
+  public static void EditMessage(Messenger esql, String authorisedUser, String targetChat){
+    try{
+      System.out.println("\tEnter message id to alter(blank to go back): ");
+      String msg = in.readLine();
+
+      if(msg.equals("")){
+	return;
+      }
+
+      String query = String.format("SELECT sender_login FROM message WHERE chat_id = %d AND msg_id = %d", Integer.parseInt(targetChat), Integer.parseInt(msg));
+      int num = esql.executeQuery(query);
+
+      if(num != 1)
+      {
+	System.out.println("\tmessage you are trying to alter does not belong to you");
+	return;
+      }
+
+      System.out.println("\tEnter new message(blank to go back): ");
+      String text = in.readLine();
+
+      if(text.equals("")){
+	return;
+      }
+
+      query = String.format("UPDATE message SET msg_text = '%s' WHERE msg_id = %d", text, Integer.parseInt(msg));
+      esql.executeUpdate(query);
+
+      System.out.println("\tMessage was successfully altered");
+    }
+    catch(Exception e){
+      System.err.println(e.getMessage());
+      return;
+    }
+  }
+  
+  public static void RemoveMessage(Messenger esql, String authorisedUser, String targetChat){
+    try{
+      System.out.println("\tEnter message id to remove(blank to go back): ");
+      String msg = in.readLine();
+
+      if(msg.equals("")){
+	return;
+      }
+
+      String query = String.format("SELECT sender_login FROM message WHERE chat_id = %d AND msg_id = %d", Integer.parseInt(targetChat), Integer.parseInt(msg));
+      int num = esql.executeQuery(query);
+
+      if(num != 1)
+      {
+	System.out.println("\tmessage you are trying to remove does not belong to you");
+	return;
+      }
+
+      query = String.format("DELETE FROM message WHERE msg_id = %d", Integer.parseInt(msg));
+      esql.executeUpdate(query);
+
+      System.out.println("\tMessage was successfully removed");
+    }
+    catch(Exception e){
+      System.err.println(e.getMessage());
+      return;
+    }
+  }
+
+  public static void PrintChats(Messenger esql, String authorisedUser, String chatId){
     try{
       //ask user what chat to open
-      System.out.println("\tEnter chat id to open(blank to go back): ");
-      String chat = in.readLine();
+      //System.out.println("\tEnter chat id to open(blank to go back): ");
+      //String chat = in.readLine();
       
       //if blank chat id, then we return back
-      if(chat.equals( "")){
-	System.out.println("exit");
-        return;
-      }
-      
-      String query = String.format("SELECT msg_id, msg_text, msg_timestamp, sender_login FROM message WHERE chat_id = %d", Integer.parseInt(chat) );
-      
-      esql.executeQueryAndPrintResult(query);
-      //List<List<String>> result = esql.executeQueryAndReturnResult(query);
-      //for(int i = 0; i < result.size(); i++){
-      // for(int j = 0; j < result.get(i).size(); j++){
-      //   
-      // }
+      //if(chat.equals( "")){
+	//System.out.println("exit");
+      //  return;
       //}
-      
-       int num = esql.executeQuery(query);
-       if(num < 1)
-       {
-	 System.out.print("\tNo messages in this chat\n");
-	 return;
-       }
-     }
+      boolean keep = true;
+      int off = 0;
+      while(keep)
+      {
+	//String query = String.format("SELECT msg_id, msg_text, msg_timestamp, sender_login FROM message WHERE chat_id = %d", Integer.parseInt(chatId) );
+	String query = String.format("SELECT msg_id, msg_text, msg_timestamp, sender_login FROM message WHERE chat_id = %d ORDER BY msg_timestamp LIMIT 10 OFFSET %d", Integer.parseInt(chatId), off);
+	//esql.executeQueryAndPrintResult(query);
+	//List<List<String>> result = esql.executeQueryAndReturnResult(query);
+	//for(int i = 0; i < result.size(); i++){
+	// for(int j = 0; j < result.get(i).size(); j++){
+	//   
+	// }
+	//}
+	int num = esql.executeQueryAndPrintResult(query);
+	//String output = String.format("num = %d\n", num);
+	//System.out.print(output);
+	if(num < 1)
+	{
+	  System.out.print("\tNo messages in this chat\n");
+	  return;
+	}
+
+	if(num == 10)
+	{
+	  boolean loop = true;
+	  while(loop)
+	  {
+	    System.out.println("Printed are the first 10 messages would you like to view the next 10?(y/n)");
+	    String answer = in.readLine();
+	    if(answer.equals("n"))
+	    {
+	      loop = false;
+	      keep = false;
+	    }
+	    if(answer.equals("y"))
+	    {
+	      off = off + 10;
+	      loop = false;
+	    }
+	    if(!answer.equals("n") && !answer.equals("y"))
+	      System.out.println("\tInput not recognized");
+	  }
+	}
+	if(num < 10)
+	  keep = false;
+      }
+    }
      catch(Exception e){
        System.err.println(e.getMessage());
        return;
@@ -680,19 +822,19 @@ public class Messenger {
     }
   }
   
-  public static void NewMessage(Messenger esql, String authorisedUser){
+  public static void NewMessage(Messenger esql, String authorisedUser, String chatId){
     try{
-      ShowChat(esql, authorisedUser);
-      System.out.print("Which chat do you want to write a message in: ");
-      String chat_id = in.readLine();
+      //ShowChat(esql, authorisedUser);
+      //System.out.print("Which chat do you want to write a message in: ");
+      //String chat_id = in.readLine();
 
       //check if the chat exists
-      String query  = String.format("SELECT * FROM chat WHERE chat_id = %d", Integer.parseInt(chat_id) );
-      int result = esql.executeQuery(query);
+      //String query  = String.format("SELECT * FROM chat WHERE chat_id = %d", Integer.parseInt(chat_id) );
+      //int result = esql.executeQuery(query);
 
-      if(result != 1){
-	return;
-      }
+      //if(result != 1){
+      //return;
+      //}
 
       System.out.println("\tEnter message(blank to go back): ");
       String msg = in.readLine();
@@ -702,9 +844,9 @@ public class Messenger {
 	return;
       }
       
-      query = String.format("INSERT INTO message (msg_text, sender_login, chat_id) VALUES('%s', '%s', %d)", msg, authorisedUser, Integer.parseInt(chat_id));
+      String query = String.format("INSERT INTO message (msg_text, sender_login, chat_id) VALUES('%s', '%s', %d)", msg, authorisedUser, Integer.parseInt(chatId));
       esql.executeUpdate(query);
-      String output = String.format("\tThe message '%s' was written successfully", msg);
+      String output = String.format("\tThe message '%s' was written successfully\n", msg);
       System.out.print(output);
       return;
     }
@@ -886,9 +1028,7 @@ public class Messenger {
                }
 
                //check if the chat room exists
-	       System.out.println("before");
                String query = String.format("SELECT * FROM chat WHERE chat_id = %s AND init_sender = '%s'", targetChat, authorisedUser);
-               System.out.println("after");
 	       List<List< String >> result = esql.executeQueryAndReturnResult(query);
                if(result.size() == 1){
                    ModifyChatOptions(esql, authorisedUser, targetChat);
